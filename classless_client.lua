@@ -176,9 +176,6 @@ local function WrapTwoLines(name, maxWidth)
   return l1, l2
 end
 
--- Flag to track when we're applying talents to prevent auto-close
-local isApplyingTalents = false
-
 local function DoShit()
   local function tCopy(t)
     local u = {}
@@ -1026,9 +1023,6 @@ local function DoShit()
     if tab ~= 1 then return end
 
     if action=="Apply" then
-      -- Set flag to prevent auto-close when talents are learned
-      isApplyingTalents = true
-
       for i=1,#spellsminus do tRemoveKey(db.spells, spellsminus[i]) end
       for i=1,#tpellsminus do tRemoveKey(db.tpells, tpellsminus[i]) end
       for i=1,#spellsplus  do if not tContains(db.spells,spellsplus[i]) then tinsert(db.spells,spellsplus[i]) end end
@@ -2033,18 +2027,6 @@ function ClassLessHandlers.LoadVars(player,spr,tpr,tar,str)
   db.talents=tar or {}
   db.stats=str or {0,0,0,0,0}
   DoShit()
-
-  -- If we were applying talents and the frame was closed, reopen it
-  if isApplyingTalents then
-    local frame = _G["CLMainFrame"]
-    if frame and not frame:IsShown() then
-      -- Use a small delay to ensure the game has finished processing
-      C_Timer.After(0.1, function()
-        ShowUIPanel(frame)
-      end)
-    end
-    isApplyingTalents = false
-  end
 end
 
 function ToggleTalentFrame()
