@@ -1402,7 +1402,7 @@ local apFrame = _G["CLPointsFrameAP"] or CreateFrame("Button", "CLPointsFrameAP"
 apFrame:SetSize(80, 29)
 apFrame:ClearAllPoints()
 apFrame:SetPoint("LEFT", pointsFrame, "LEFT", 0, 0)
-apFrame.text = apFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+apFrame.text = apFrame.text or apFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 apFrame.text:SetPoint("RIGHT", 0, -1)
 
 apFrame:SetScript("OnEnter", function(self)
@@ -1418,7 +1418,7 @@ local tpFrame = _G["CLPointsFrameTP"] or CreateFrame("Button", "CLPointsFrameTP"
 tpFrame:SetSize(80, 29)
 tpFrame:ClearAllPoints()
 tpFrame:SetPoint("LEFT", apFrame, "RIGHT", 3, 0)
-tpFrame.text = tpFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+tpFrame.text = tpFrame.text or tpFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 tpFrame.text:SetPoint("RIGHT", 0, -1)
 
 tpFrame:SetScript("OnEnter", function(self)
@@ -1434,7 +1434,7 @@ local spFrame = _G["CLPointsFrameSP"] or CreateFrame("Button", "CLPointsFrameSP"
 spFrame:SetSize(80, 29)
 spFrame:ClearAllPoints()
 spFrame:SetPoint("LEFT", tpFrame, "RIGHT", 3, 0)
-spFrame.text = spFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+spFrame.text = spFrame.text or spFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 spFrame.text:SetPoint("RIGHT", 0, -1)
 
 spFrame:SetScript("OnEnter", function(self)
