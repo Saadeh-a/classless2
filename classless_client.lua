@@ -1742,56 +1742,150 @@ local function SpecTooltip(btn, class, spec)
   btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
+-- Helper function to compute AP/TP used in a spec (must be before ShowUnlearnMenu)
+local function ComputeSpecUsed(class, spec, learnedSet)
+  local apUsed, tpUsed = 0, 0
+  local sNodes = (db.data.spells[class] and db.data.spells[class][spec] and db.data.spells[class][spec][4]) or {}
+  for _, entry in ipairs(sNodes) do
+    for _, sid in ipairs(entry[1] or {}) do
+      if learnedSet[sid] then
+        local c = CostIndex[sid]
+        if c then apUsed = apUsed + (c.ap or 0); tpUsed = tpUsed + (c.tp or 0) end
+      end
+    end
+  end
+  local tNodes = (db.data.talents[class] and db.data.talents[class][spec] and db.data.talents[class][spec][4]) or {}
+  for _, entry in ipairs(tNodes) do
+    for _, sid in ipairs(entry[1] or {}) do
+      if learnedSet[sid] then
+        local c = CostIndex[sid]
+        if c then apUsed = apUsed + (c.ap or 0); tpUsed = tpUsed + (c.tp or 0) end
+      end
+    end
+  end
+  return apUsed, tpUsed
+end
+
 local function ShowUnlearnMenu(btn, class, spec)
-  local menu = CreateFrame("Frame", "CLUnlearnMenu", UIParent, "UIDropDownMenuTemplate")
-  
+  -- Check if player has any learned AP or TP in this spec
+  local _, _, _, learnedSet = BuildEffectiveSets()
+  local apUsed, tpUsed = ComputeSpecUsed(class, spec, learnedSet)
+
+  -- Don't show menu if no powers learned in this spec
+  if (apUsed or 0) == 0 and (tpUsed or 0) == 0 then
+    return
+  end
+
+  -- Create custom popup frame instead of dropdown
+  local popup = _G["CLUnlearnPopup"]
+  if not popup then
+    popup = CreateFrame("Frame", "CLUnlearnPopup", UIParent, BackdropTemplateMixin and "BackdropTemplate")
+    popup:SetSize(200, 100)
+    popup:SetFrameStrata("DIALOG")
+    popup:SetBackdrop({
+      bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+      edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+      tile = true, tileSize = 32, edgeSize = 32,
+      insets = { left = 8, right = 8, top = 8, bottom = 8 }
+    })
+    popup:SetBackdropColor(0, 0, 0, 0.9)
+    popup:EnableMouse(true)
+    popup:SetMovable(false)
+
+    -- Title frame with icon and spec name
+    popup.titleFrame = CreateFrame("Frame", nil, popup)
+    popup.titleFrame:SetSize(184, 24)
+    popup.titleFrame:SetPoint("TOP", 0, -12)
+
+    popup.icon = popup.titleFrame:CreateTexture(nil, "ARTWORK")
+    popup.icon:SetSize(20, 20)
+    popup.icon:SetPoint("LEFT", 4, 0)
+
+    popup.titleText = popup.titleFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    popup.titleText:SetPoint("LEFT", popup.icon, "RIGHT", 4, 0)
+    popup.titleText:SetJustifyH("LEFT")
+
+    -- Buttons container
+    popup.buttons = {}
+  end
+
+  -- Clear existing buttons
+  for _, btn in ipairs(popup.buttons) do
+    btn:Hide()
+  end
+  wipe(popup.buttons)
+
+  -- Set title with spec icon and name
+  local iconName = (db.data.spells[class] and db.data.spells[class][spec] and db.data.spells[class][spec][2]) or "INV_Misc_QuestionMark"
+  popup.icon:SetTexture("Interface\\Icons\\" .. iconName)
+  local dispName = SpecDisplayName(class, spec)
+  popup.titleText:SetText(WOW_GOLD .. dispName .. "|r")
+
   local function UnlearnSpells()
     AIO.Handle("ClassLess", "UnlearnSpec", class, spec, "spells")
-    CloseDropDownMenus()
+    popup:Hide()
   end
-  
+
   local function UnlearnTalents()
     AIO.Handle("ClassLess", "UnlearnSpec", class, spec, "talents")
-    CloseDropDownMenus()
+    popup:Hide()
   end
-  
-  local function UnlearnBoth()
-    AIO.Handle("ClassLess", "UnlearnSpec", class, spec, "both")
-    CloseDropDownMenus()
+
+  -- Build menu options based on what's learned
+  local yOffset = -40
+  local buttonHeight = 24
+  local menuOptions = {}
+
+  if apUsed > 0 then
+    table.insert(menuOptions, {text = "Unlearn Ability Power", func = UnlearnSpells})
   end
-  
-  local menuTable = {
-    {text = "Unlearn Ability Power", func = UnlearnSpells, notCheckable = true},
-    {text = "Unlearn Talent Power", func = UnlearnTalents, notCheckable = true},
-    {text = "Unlearn Ability and Talent Power", func = UnlearnBoth, notCheckable = true}
-  }
-  
-  EasyMenu(menuTable, menu, "cursor", 0, 0, "MENU")
+
+  if tpUsed > 0 then
+    table.insert(menuOptions, {text = "Unlearn Talent Power", func = UnlearnTalents})
+  end
+
+  -- Create buttons
+  for i, option in ipairs(menuOptions) do
+    local optBtn = CreateFrame("Button", nil, popup)
+    optBtn:SetSize(180, buttonHeight)
+    optBtn:SetPoint("TOP", 0, yOffset - ((i-1) * (buttonHeight + 2)))
+
+    optBtn:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+    optBtn:SetHighlightTexture("Interface\\Buttons\\UI-Panel-Button-Highlight")
+    optBtn:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
+
+    local fs = optBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("CENTER")
+    fs:SetText(option.text)
+
+    optBtn:SetScript("OnClick", option.func)
+
+    table.insert(popup.buttons, optBtn)
+  end
+
+  -- Adjust popup height based on number of options
+  local totalHeight = 50 + (#menuOptions * (buttonHeight + 2))
+  popup:SetHeight(totalHeight)
+
+  -- Anchor to middle-right of the spec button
+  popup:ClearAllPoints()
+  popup:SetPoint("LEFT", btn, "RIGHT", 5, 0)
+
+  popup:Show()
+
+  -- Auto-close on outside click
+  popup:SetScript("OnUpdate", function(self)
+    if not MouseIsOver(self) and GetMouseFocus() ~= self then
+      if IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton") then
+        self:Hide()
+        self:SetScript("OnUpdate", nil)
+      end
+    end
+  end)
 end
 
 
-  local function ComputeSpecUsed(class, spec, learnedSet)
-    local apUsed, tpUsed = 0,0
-    local sNodes = (db.data.spells[class] and db.data.spells[class][spec] and db.data.spells[class][spec][4]) or {}
-    for _, entry in ipairs(sNodes) do
-      for _, sid in ipairs(entry[1] or {}) do
-        if learnedSet[sid] then
-          local c = CostIndex[sid]
-          if c then apUsed = apUsed + (c.ap or 0); tpUsed = tpUsed + (c.tp or 0) end
-        end
-      end
-    end
-    local tNodes = (db.data.talents[class] and db.data.talents[class][spec] and db.data.talents[class][spec][4]) or {}
-    for _, entry in ipairs(tNodes) do
-      for _, sid in ipairs(entry[1] or {}) do
-        if learnedSet[sid] then
-          local c = CostIndex[sid]
-          if c then apUsed = apUsed + (c.ap or 0); tpUsed = tpUsed + (c.tp or 0) end
-        end
-      end
-    end
-    return apUsed, tpUsed
-  end
+-- ComputeSpecUsed is now defined earlier in the file (before ShowUnlearnMenu)
 
 UpdateSpecUsage = function()
   local _,_,_, set = BuildEffectiveSets()
@@ -2038,9 +2132,15 @@ function ClassLessHandlers.LoadVars(player,spr,tpr,tar,str)
   if isApplyingTalents then
     local frame = _G["CLMainFrame"]
     if frame and not frame:IsShown() then
-      -- Use a small delay to ensure the game has finished processing
-      C_Timer.After(0.1, function()
-        ShowUIPanel(frame)
+      -- Use a small delay to ensure the game has finished processing (3.3.5 compatible)
+      local delayFrame = CreateFrame("Frame")
+      local elapsed = 0
+      delayFrame:SetScript("OnUpdate", function(self, delta)
+        elapsed = elapsed + delta
+        if elapsed >= 0.1 then
+          ShowUIPanel(frame)
+          self:SetScript("OnUpdate", nil)
+        end
       end)
     end
     isApplyingTalents = false
