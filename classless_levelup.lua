@@ -14,6 +14,25 @@ local function OnLevelChanged(_, player, oldLevel)
   if tpGained > 0 then
     player:AddItem(TP_ITEM, tpGained)
   end
+
+  -- Grant stat points on level up (5 points per level)
+  local guid = player:GetGUIDLow()
+  local q = CharDBQuery("SELECT `stats` FROM `custom`.`classless_spells` WHERE guid="..guid)
+  if q then
+    local str = q:GetString(0)
+    local parts = {}
+    for v in string.gmatch(str, '([^,]+)') do
+      table.insert(parts, tonumber(v) or 0)
+    end
+    local left = (parts[1] or 0) + (STAT_POINTS_PER_USE * gained)
+    parts[1] = left
+    local newStr = table.concat(parts, ",")
+    CharDBQuery("UPDATE `custom`.`classless_spells` SET `stats`='"..newStr.."' WHERE guid="..guid)
+
+    AIO.Handle(player, "StatAllocation", "SetStats", parts[1], parts[2], parts[3], parts[4], parts[5], parts[6])
+
+    player:SendBroadcastMessage("Gained "..(STAT_POINTS_PER_USE * gained).." stat points")
+  end
 end
 
 local function OnUseStatItem(_, player, item)
