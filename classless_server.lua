@@ -245,6 +245,95 @@ end
 
 TryLoadClassLessData()
 
+-- ============================================================
+-- Shared Cost Calculation Function
+-- ============================================================
+local function getCost(spellId)
+  if not CLDB or not CLDB.data then return 0, 0 end
+
+  -- Search in spells database
+  for _, classTbl in pairs(CLDB.data.spells or {}) do
+    for spec=1,#classTbl do
+      for _, entry in ipairs(classTbl[spec][4] or {}) do
+        local ranks = entry[1] or {}
+        for r=1,#ranks do
+          if ranks[r] == spellId then
+            local meta = entry[4]
+            local baseAP = 1
+            local baseTP = 0
+
+            if type(meta) == "table" then
+              local cost = meta.cost or meta.Cost
+              if not cost and (meta.ap or meta.tp or meta.AP or meta.TP or meta[1] or meta[2]) then
+                cost = meta
+              end
+              if cost then
+                local ap = cost.ap or cost.AP or cost[1]
+                local tp = cost.tp or cost.TP or cost[2]
+                if type(ap) == "table" then ap = ap[r] end
+                if type(tp) == "table" then tp = tp[r] end
+                ap = tonumber(ap) or 0
+                tp = tonumber(tp) or 0
+                if ap ~= nil or tp ~= nil then
+                  return ap, tp
+                end
+              end
+            end
+
+            if meta == 1 then
+              return baseAP, (r == 1) and 1 or 0
+            end
+
+            return baseAP, baseTP
+          end
+        end
+      end
+    end
+  end
+
+  -- Search in talents database
+  for _, classTbl in pairs(CLDB.data.talents or {}) do
+    for spec=1,#classTbl do
+      for _, entry in ipairs(classTbl[spec][4] or {}) do
+        local ranks = entry[1] or {}
+        for r=1,#ranks do
+          if ranks[r] == spellId then
+            local meta = entry[4]
+            local baseAP = 0
+            local baseTP = 1
+
+            if type(meta) == "table" then
+              local cost = meta.cost or meta.Cost
+              if not cost and (meta.ap or meta.tp or meta.AP or meta.TP or meta[1] or meta[2]) then
+                cost = meta
+              end
+              if cost then
+                local ap = cost.ap or cost.AP or cost[1]
+                local tp = cost.tp or cost.TP or cost[2]
+                if type(ap) == "table" then ap = ap[r] end
+                if type(tp) == "table" then tp = tp[r] end
+                ap = tonumber(ap) or 0
+                tp = tonumber(tp) or 0
+                if ap ~= nil or tp ~= nil then
+                  return ap, tp
+                end
+              end
+            end
+
+            if meta == 1 then
+              return (r == 1) and 1 or 0, baseTP
+            end
+
+            return baseAP, baseTP
+          end
+        end
+      end
+    end
+  end
+
+  return 0, 0
+end
+
 local function ExpandGrants(nodeSet)
   local out = {}
   for k,_ in pairs(nodeSet or {}) do out[k] = true end
@@ -278,7 +367,7 @@ local spells, tpells, talents = {}, {}, {}
 local function DBEnsureClasslessRow(guid)
   local q = CharDBQuery("SELECT `guid` FROM `custom`.`classless_spells` WHERE guid="..guid)
   if not q then
-    CharDBQuery("INSERT INTO `custom`.`classless_spells` (`guid`,`spells`,`tpells`,`talents`,`stats`) VALUES ("..guid..", '', '', '', '0,0,0,0,0')")
+    CharDBQuery("INSERT INTO `custom`.`classless_spells` (`guid`,`spells`,`tpells`,`talents`,`stats`) VALUES ("..guid..", '', '', '', '0,0,0,0,0,0')")
   end
 end
 
@@ -340,90 +429,7 @@ function ClassLess.ApplyAll(player, newSpells, newTpells, newTalents)
   local AP_ITEM = 16203
   local TP_ITEM = 11135
 
-  -- Calculate costs
-  local function getCost(spellId)
-    if not CLDB or not CLDB.data then return 0, 0 end
-    
-    for _, classTbl in pairs(CLDB.data.spells or {}) do
-      for spec=1,#classTbl do
-        for _, entry in ipairs(classTbl[spec][4] or {}) do
-          local ranks = entry[1] or {}
-          for r=1,#ranks do
-            if ranks[r] == spellId then
-              local meta = entry[4]
-              local baseAP = 1
-              local baseTP = 0
-              
-              if type(meta) == "table" then
-                local cost = meta.cost or meta.Cost
-                if not cost and (meta.ap or meta.tp or meta.AP or meta.TP or meta[1] or meta[2]) then
-                  cost = meta
-                end
-                if cost then
-                  local ap = cost.ap or cost.AP or cost[1]
-                  local tp = cost.tp or cost.TP or cost[2]
-                  if type(ap) == "table" then ap = ap[r] end
-                  if type(tp) == "table" then tp = tp[r] end
-                  ap = tonumber(ap) or 0
-                  tp = tonumber(tp) or 0
-                  if ap ~= nil or tp ~= nil then
-                    return ap, tp
-                  end
-                end
-              end
-              
-              if meta == 1 then
-                return baseAP, (r == 1) and 1 or 0
-              end
-              
-              return baseAP, baseTP
-            end
-          end
-        end
-      end
-    end
-    
-    for _, classTbl in pairs(CLDB.data.talents or {}) do
-      for spec=1,#classTbl do
-        for _, entry in ipairs(classTbl[spec][4] or {}) do
-          local ranks = entry[1] or {}
-          for r=1,#ranks do
-            if ranks[r] == spellId then
-              local meta = entry[4]
-              local baseAP = 0
-              local baseTP = 1
-              
-              if type(meta) == "table" then
-                local cost = meta.cost or meta.Cost
-                if not cost and (meta.ap or meta.tp or meta.AP or meta.TP or meta[1] or meta[2]) then
-                  cost = meta
-                end
-                if cost then
-                  local ap = cost.ap or cost.AP or cost[1]
-                  local tp = cost.tp or cost.TP or cost[2]
-                  if type(ap) == "table" then ap = ap[r] end
-                  if type(tp) == "table" then tp = tp[r] end
-                  ap = tonumber(ap) or 0
-                  tp = tonumber(tp) or 0
-                  if ap ~= nil or tp ~= nil then
-                    return ap, tp
-                  end
-                end
-              end
-              
-              if meta == 1 then
-                return (r == 1) and 1 or 0, baseTP
-              end
-              
-              return baseAP, baseTP
-            end
-          end
-        end
-      end
-    end
-    
-    return 0, 0
-  end
+  -- Use shared getCost() function defined at module level
 
   local oldSpells = spells[guid] or {}
   local oldTpells = tpells[guid] or {}
@@ -520,91 +526,9 @@ function ClassLess.UnlearnSpec(player, class, spec, mode)
   local guid = player:GetGUIDLow()
   local AP_ITEM = 16203
   local TP_ITEM = 11135
-  
-  local function getCost(spellId)
-    if not CLDB or not CLDB.data then return 0, 0 end
-    
-    for _, classTbl in pairs(CLDB.data.spells or {}) do
-      for s=1,#classTbl do
-        for _, entry in ipairs(classTbl[s][4] or {}) do
-          local ranks = entry[1] or {}
-          for r=1,#ranks do
-            if ranks[r] == spellId then
-              local meta = entry[4]
-              local baseAP = 1
-              local baseTP = 0
-              
-              if type(meta) == "table" then
-                local cost = meta.cost or meta.Cost
-                if not cost and (meta.ap or meta.tp or meta.AP or meta.TP or meta[1] or meta[2]) then
-                  cost = meta
-                end
-                if cost then
-                  local ap = cost.ap or cost.AP or cost[1]
-                  local tp = cost.tp or cost.TP or cost[2]
-                  if type(ap) == "table" then ap = ap[r] end
-                  if type(tp) == "table" then tp = tp[r] end
-                  ap = tonumber(ap) or 0
-                  tp = tonumber(tp) or 0
-                  if ap ~= nil or tp ~= nil then
-                    return ap, tp
-                  end
-                end
-              end
-              
-              if meta == 1 then
-                return baseAP, (r == 1) and 1 or 0
-              end
-              
-              return baseAP, baseTP
-            end
-          end
-        end
-      end
-    end
-    
-    for _, classTbl in pairs(CLDB.data.talents or {}) do
-      for s=1,#classTbl do
-        for _, entry in ipairs(classTbl[s][4] or {}) do
-          local ranks = entry[1] or {}
-          for r=1,#ranks do
-            if ranks[r] == spellId then
-              local meta = entry[4]
-              local baseAP = 0
-              local baseTP = 1
-              
-              if type(meta) == "table" then
-                local cost = meta.cost or meta.Cost
-                if not cost and (meta.ap or meta.tp or meta.AP or meta.TP or meta[1] or meta[2]) then
-                  cost = meta
-                end
-                if cost then
-                  local ap = cost.ap or cost.AP or cost[1]
-                  local tp = cost.tp or cost.TP or cost[2]
-                  if type(ap) == "table" then ap = ap[r] end
-                  if type(tp) == "table" then tp = tp[r] end
-                  ap = tonumber(ap) or 0
-                  tp = tonumber(tp) or 0
-                  if ap ~= nil or tp ~= nil then
-                    return ap, tp
-                  end
-                end
-              end
-              
-              if meta == 1 then
-                return (r == 1) and 1 or 0, baseTP
-              end
-              
-              return baseAP, baseTP
-            end
-          end
-        end
-      end
-    end
-    
-    return 0, 0
-  end
-  
+
+  -- Use shared getCost() function defined at module level
+
   local specSpells = {}
   if CLDB and CLDB.data and CLDB.data.spells and CLDB.data.spells[class] and CLDB.data.spells[class][spec] then
     for _, entry in ipairs(CLDB.data.spells[class][spec][4] or {}) do

@@ -44,8 +44,6 @@ local function OnUseStatItem(_, player, item)
     msg:Send(player)
   end
 end
-  end
-end
 
 RegisterPlayerEvent(13, OnLevelChanged)
 RegisterPlayerEvent(8, OnUseStatItem)
