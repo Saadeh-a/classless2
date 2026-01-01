@@ -2033,21 +2033,9 @@ btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
       end
   end
 
-  local function OnEvent(self, event, ...)
-    if event == "BAG_UPDATE" then
-      OnBagUpdate()
-    elseif event == "PLAYER_STARTED_MOVING" or event == "PLAYER_CONTROL_LOST" or event == "ACTIONBAR_SLOT_CHANGED" then
-      -- Close unlearn menu on movement or other actions
-      CloseDropDownMenus()
-    end
-  end
-
   local eventFrame = CreateFrame("Frame")
   eventFrame:RegisterEvent("BAG_UPDATE")
-  eventFrame:RegisterEvent("PLAYER_STARTED_MOVING")
-  eventFrame:RegisterEvent("PLAYER_CONTROL_LOST")
-  eventFrame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-  eventFrame:SetScript("OnEvent", OnEvent)
+  eventFrame:SetScript("OnEvent", OnBagUpdate)
 
 
 frame:SetScript("OnShow", function()
