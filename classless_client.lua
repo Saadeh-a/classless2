@@ -1006,7 +1006,6 @@ local function DoShit()
     local main = _G["CLMainFrame"]; if not main then return end
     local tab = main:GetAttribute("tab") or 0
     local frameBtns = _G["CLResetButtonFrame"]; if not frameBtns then return end
-    if UpdateTopBar then UpdateTopBar() end
 
     if tab ~= 1 then FrameHide(frameBtns); return end
     FrameShow(frameBtns)
@@ -1266,20 +1265,29 @@ end
 
       button:SetScript("OnClick", function(self, key)
         local shift = IsShiftKeyDown()
+        local didChange = false
+
         if mode=="talent" and shift then
           if key=="LeftButton" and allowLeft then
             local stepRank = rank
+            -- Cache initial points to avoid recalculating in loop
+            local apNow = select(1, GetPoints("ap"))
+            local tpNow = select(1, GetPoints("tp"))
+
             while stepRank < ranks do
               local nextRank = stepRank + 1
               local nextSpell = spellid[nextRank]
               local nextLevel = levelid[nextRank]
               if UnitLevel("player") < (nextLevel or 1) then break end
-              local apNow = select(1, GetPoints("ap"))
-              local tpNow = select(1, GetPoints("tp"))
+
               local needAP, needTP = GetNodeCost("talent", nodes[i], nextRank)
               if apNow < needAP or tpNow < needTP then break end
+
               TempLearnTalent(nextSpell)
+              apNow = apNow - needAP
+              tpNow = tpNow - needTP
               stepRank = stepRank + 1
+              didChange = true
             end
           end
           if key=="RightButton" and allowRight then
@@ -1288,18 +1296,26 @@ end
               local curSpell = spellid[stepRank]
               TempUnlearnTalent(curSpell)
               stepRank = stepRank - 1
+              didChange = true
             end
           end
         else
           if key=="LeftButton" and allowLeft then
             if mode=="spell" then TempLearnSpell(nspell) else TempLearnTalent(nspell) end
+            didChange = true
           end
           if key=="RightButton" and allowRight then
             if mode=="spell" then TempUnlearnSpell(spell) else TempUnlearnTalent(spell) end
+            didChange = true
           end
         end
-        FillSpells(class, spec, parent, mode)
-        UpdateApplyReset()
+
+        -- Only update UI once at the end
+        if didChange then
+          FillSpells(class, spec, parent, mode)
+          UpdateApplyReset()
+        end
+
         local onEnter = self:GetScript("OnEnter")
         if onEnter and self:IsMouseOver() then onEnter(self) end
       end)
@@ -1737,30 +1753,52 @@ local function SpecTooltip(btn, class, spec)
 end
 
 local function ShowUnlearnMenu(btn, class, spec)
+  -- Check if this spec has any learned AP or TP
+  local _,_,_, set = BuildEffectiveSets()
+  local apUsed, tpUsed = ComputeSpecUsed(class, spec, set)
+
+  -- If nothing is learned, don't show the menu
+  if (apUsed or 0) == 0 and (tpUsed or 0) == 0 then
+    return
+  end
+
   local menu = CreateFrame("Frame", "CLUnlearnMenu", UIParent, "UIDropDownMenuTemplate")
-  
+
   local function UnlearnSpells()
     AIO.Handle("ClassLess", "UnlearnSpec", class, spec, "spells")
     CloseDropDownMenus()
   end
-  
+
   local function UnlearnTalents()
     AIO.Handle("ClassLess", "UnlearnSpec", class, spec, "talents")
     CloseDropDownMenus()
   end
-  
-  local function UnlearnBoth()
-    AIO.Handle("ClassLess", "UnlearnSpec", class, spec, "both")
-    CloseDropDownMenus()
+
+  -- Build menu table based on what's learned
+  local menuTable = {}
+
+  -- Add title with spec icon and name
+  local iconName = (db.data.spells and db.data.spells[class] and db.data.spells[class][spec] and db.data.spells[class][spec][2]) or "INV_Misc_QuestionMark"
+  local specIcon = "|TInterface\\Icons\\" .. iconName .. ":16:16:0:0|t"
+  local dispName = SpecDisplayName(class, spec)
+  table.insert(menuTable, {text = specIcon .. " " .. dispName, isTitle = true, notCheckable = true})
+
+  -- Only add options for learned powers
+  if (apUsed or 0) > 0 then
+    table.insert(menuTable, {text = "Unlearn Ability Power", func = UnlearnSpells, notCheckable = true})
   end
-  
-  local menuTable = {
-    {text = "Unlearn Ability Power", func = UnlearnSpells, notCheckable = true},
-    {text = "Unlearn Talent Power", func = UnlearnTalents, notCheckable = true},
-    {text = "Unlearn Ability and Talent Power", func = UnlearnBoth, notCheckable = true}
-  }
-  
-  EasyMenu(menuTable, menu, "cursor", 0, 0, "MENU")
+
+  if (tpUsed or 0) > 0 then
+    table.insert(menuTable, {text = "Unlearn Talent Power", func = UnlearnTalents, notCheckable = true})
+  end
+
+  -- Position menu to the right of the button
+  EasyMenu(menuTable, menu, btn, 0, 0, "MENU", 1)
+
+  -- Store reference for closing
+  if not _G.CLActiveUnlearnMenu then
+    _G.CLActiveUnlearnMenu = menu
+  end
 end
 
 
@@ -1847,6 +1885,8 @@ btn:SetScript("OnClick", function(self, button)
   if button == "RightButton" then
     ShowUnlearnMenu(btn, class, spec)
   else
+    -- Close any open unlearn menu when switching specs
+    CloseDropDownMenus()
     PlaySound("igCharacterInfoTab")
     ShowSpec(class, spec)
     UpdateSpecButtonHighlights()
@@ -1992,6 +2032,7 @@ btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
          FillSpells(selectedClass, selectedSpec, _G["CLSpecTalents_"..selectedClass.."_"..selectedSpec], "talent")
       end
   end
+
   local eventFrame = CreateFrame("Frame")
   eventFrame:RegisterEvent("BAG_UPDATE")
   eventFrame:SetScript("OnEvent", OnBagUpdate)
@@ -2026,7 +2067,24 @@ function ClassLessHandlers.LoadVars(player,spr,tpr,tar,str)
   db.tpells=tpr or {}
   db.talents=tar or {}
   db.stats=str or {0,0,0,0,0}
-  DoShit()
+
+  -- Clear any pending changes when receiving fresh data from server
+  wipe(spellsplus); wipe(spellsminus)
+  wipe(tpellsplus); wipe(tpellsminus)
+  wipe(talentsplus); wipe(talentsminus)
+
+  -- If UI is already initialized, update it
+  if _G["CLMainFrame"] and _G["CLMainFrame"]:IsShown() then
+    -- Refresh the currently displayed spec
+    if selectedClass and selectedSpec and currentSpecFrame then
+      FillSpells(selectedClass, selectedSpec, _G["CLSpecSpells_"..selectedClass.."_"..selectedSpec], "spell")
+      FillSpells(selectedClass, selectedSpec, _G["CLSpecTalents_"..selectedClass.."_"..selectedSpec], "talent")
+    end
+    UpdateApplyReset()
+  else
+    -- Initial load - build everything
+    DoShit()
+  end
 end
 
 function ToggleTalentFrame()
