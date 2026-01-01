@@ -1,0 +1,177 @@
+=================================================================
+CRITICAL FIXES PATCH - classless_client.lua (Lines 1000-2036)
+=================================================================
+
+Apply these exact changes to fix critical issues:
+
+-----------------------------------------------------------------
+FIX #1: REMOVE OnUpdate Performance Killer (CRITICAL!)
+-----------------------------------------------------------------
+Location: Lines 2010-2012
+
+DELETE THESE LINES:
+  frame:SetScript("OnUpdate", function()
+    UpdateApplyReset()
+  end)
+
+REPLACE WITH:
+  -- OnUpdate removed to prevent performance issues
+  -- Updates are triggered by events (BAG_UPDATE, OnShow, button clicks)
+
+-----------------------------------------------------------------
+FIX #2: Fix DoShit() Function Call
+-----------------------------------------------------------------
+Location: Line 2029
+
+CHANGE:
+  DoShit()
+
+TO:
+  InitializeClasslessUI()
+
+-----------------------------------------------------------------
+FIX #3: Fix Path Separators (Multiple Locations)
+-----------------------------------------------------------------
+
+Line 1229:
+CHANGE: button.nameText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+TO:     button.nameText:SetFont("Fonts/FRIZQT__.TTF", 10, "OUTLINE")
+
+Line 1241:
+CHANGE: button.levelText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+TO:     button.levelText:SetFont("Fonts/FRIZQT__.TTF", 10, "OUTLINE")
+
+Line 1336:
+CHANGE: icon:SetTexture('interface\\ClasslessUI\\Mainbutton')
+TO:     icon:SetTexture('interface/ClasslessUI/Mainbutton')
+
+Line 1356:
+CHANGE: frame.bg:SetTexture("interface\\ClasslessUI\\progress_inside_blue")
+TO:     frame.bg:SetTexture("interface/ClasslessUI/progress_inside_blue")
+
+Line 1392-1394:
+CHANGE: close:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
+        close:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
+        close:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
+TO:     close:SetNormalTexture("Interface/Buttons/UI-Panel-MinimizeButton-Up")
+        close:SetPushedTexture("Interface/Buttons/UI-Panel-MinimizeButton-Down")
+        close:SetHighlightTexture("Interface/Buttons/UI-Panel-MinimizeButton-Highlight")
+
+Line 1625:
+CHANGE: local usageFont, usageSize = "Fonts\\FRIZQT__.TTF", 9
+TO:     local usageFont, usageSize = "Fonts/FRIZQT__.TTF", 9
+
+Line 1655-1656:
+CHANGE: bgFile   = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+TO:     bgFile   = "Interface/Buttons/WHITE8X8",
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+
+Line 1662:
+CHANGE: b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+TO:     b:SetHighlightTexture("Interface/QuestFrame/UI-QuestTitleHighlight")
+
+Line 1672:
+CHANGE: b:SetPushedTexture("Interface\\Buttons\\UI-Listbox-Highlight2")
+TO:     b:SetPushedTexture("Interface/Buttons/UI-Listbox-Highlight2")
+
+Line 1682:
+CHANGE: b.selectedTex:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight2")
+TO:     b.selectedTex:SetTexture("Interface/Buttons/UI-Listbox-Highlight2")
+
+Line 1690:
+CHANGE: b.selStripe:SetTexture("Interface\\Buttons\\WHITE8X8")
+TO:     b.selStripe:SetTexture("Interface/Buttons/WHITE8X8")
+
+Line 1700:
+CHANGE: b.label:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+TO:     b.label:SetFont("Fonts/FRIZQT__.TTF", 10, "OUTLINE")
+
+Line 1732:
+CHANGE: local specIcon = ("|TInterface\\Icons\\%s:%d:%d:0:%d|t"):format(iconName, ICON, ICON, YOFF)
+TO:     local specIcon = ("|TInterface/Icons/%s:%d:%d:0:%d|t"):format(iconName, ICON, ICON, YOFF)
+
+Line 1839:
+CHANGE: local iconTex  = "|TInterface\\Icons\\" .. iconName .. ":20|t"
+TO:     local iconTex  = "|TInterface/Icons/" .. iconName .. ":20|t"
+
+Line 1872:
+CHANGE: fontAttributesTitle:SetFont("Fonts\\FRIZQT__.TTF", 12.5)
+TO:     fontAttributesTitle:SetFont("Fonts/FRIZQT__.TTF", 12.5)
+
+Line 1887:
+CHANGE: AttributesLeftVisual1:SetBackdrop({ bgFile = "interface\\ClasslessUI\\dialog_glow" })
+TO:     AttributesLeftVisual1:SetBackdrop({ bgFile = "interface/ClasslessUI/dialog_glow" })
+
+Line 1890:
+CHANGE: fontAttributesPointsLeft:SetFont("Fonts\\FRIZQT__.TTF", 15, "OUTLINE")
+TO:     fontAttributesPointsLeft:SetFont("Fonts/FRIZQT__.TTF", 15, "OUTLINE")
+
+Line 1921:
+CHANGE: frameStat:SetBackdrop({ bgFile = "interface\\ClasslessUI\\allocationbuttonframe" })
+TO:     frameStat:SetBackdrop({ bgFile = "interface/ClasslessUI/allocationbuttonframe" })
+
+Line 1971:
+CHANGE: value:SetFont("Fonts\\FRIZQT__.TTF", 15)
+TO:     value:SetFont("Fonts/FRIZQT__.TTF", 15)
+
+Line 1977-1981 (all stat blocks):
+CHANGE: "interface\\ClasslessUI\\strength"
+TO:     "interface/ClasslessUI/strength"
+
+(Apply same pattern to stamina, agility, intellect, spirit paths)
+
+-----------------------------------------------------------------
+FIX #4: Fix Indentation Issue (Lines 1147-1157)
+-----------------------------------------------------------------
+CHANGE:
+      local learned = (rank > 0)
+      -- Visual rule: ONLY learned spells are highlighted
+local icon = button.texture or button.icon  -- pick whichever your UI uses
+
+if learned then
+  icon:SetDesaturated(false)
+  icon:SetVertexColor(1, 1, 1)
+  icon:SetAlpha(1)
+else
+  icon:SetDesaturated(true)
+  icon:SetVertexColor(0.35, 0.35, 0.35)  -- darker = more "black/grey"
+  icon:SetAlpha(0.85)                     -- optional
+end
+
+TO:
+      local learned = (rank > 0)
+      -- Visual rule: ONLY learned spells are highlighted
+      local iconTex = button.texture or button.icon
+
+      if learned then
+        iconTex:SetDesaturated(false)
+        iconTex:SetVertexColor(1, 1, 1)
+        iconTex:SetAlpha(1)
+      else
+        iconTex:SetDesaturated(true)
+        iconTex:SetVertexColor(0.35, 0.35, 0.35)
+        iconTex:SetAlpha(0.85)
+      end
+
+-----------------------------------------------------------------
+VALIDATION
+-----------------------------------------------------------------
+After applying all fixes, verify:
+
+1. No Lua errors when loading UI
+2. Frame opens and displays correctly
+3. No lag/stutter when frame is open (OnUpdate removed!)
+4. Buttons respond to clicks
+5. Spell costs display correctly
+6. Talents can be learned/unlearned
+7. Stats can be allocated
+
+Test on BOTH Windows and Linux if possible.
+
+-----------------------------------------------------------------
+BACKUP
+-----------------------------------------------------------------
+Original file backed up to: classless_client.lua.backup
+
+-----------------------------------------------------------------
